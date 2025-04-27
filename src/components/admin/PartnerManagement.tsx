@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Eye, Power, Plus } from "lucide-react";
+import { Edit, Trash2, Power, Plus } from "lucide-react";
 import { Partner, PartnerType } from "@/models/Partner";
 import { getPartners, togglePartnerStatus } from "@/services/partnerService";
 import { useToast } from "@/components/ui/use-toast";
@@ -29,6 +30,7 @@ export default function PartnerManagement() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPartners();
@@ -155,13 +157,7 @@ export default function PartnerManagement() {
                         >
                           <Power className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          title="View Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+
                         <Button
                           variant="outline"
                           size="icon"

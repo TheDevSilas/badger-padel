@@ -3,6 +3,7 @@ import {
   PartnerApplication,
   ApplicationStatus,
   Partner,
+  Discount,
 } from "../models/Partner";
 
 /**
@@ -110,24 +111,20 @@ export async function approveApplication(
  * Fetch all partners
  */
 export async function getPartners(): Promise<Partner[]> {
-  const { data, error } = await supabase
-    .from("partners")
-    .select("*")
-    .eq("active", true)
-    .order("name");
+  const { data, error } = await supabase.from("partners").select("*");
 
   if (error) {
     console.error("Error fetching partners:", error);
-    throw error;
+    throw new Error("Failed to fetch partners");
   }
 
-  return data || [];
+  return data as Partner[];
 }
 
 /**
  * Fetch a single partner by ID
  */
-export async function getPartnerById(id: string): Promise<Partner | null> {
+export async function getPartnerById(id: string): Promise<Partner> {
   const { data, error } = await supabase
     .from("partners")
     .select("*")
@@ -136,10 +133,43 @@ export async function getPartnerById(id: string): Promise<Partner | null> {
 
   if (error) {
     console.error("Error fetching partner:", error);
-    throw error;
+    throw new Error("Failed to fetch partner details");
   }
 
-  return data;
+  return data as Partner;
+}
+
+/**
+ * Create a new partner
+ */
+export async function createPartner(
+  partnerData: Partial<Partner>,
+): Promise<void> {
+  // Format discounts if they are strings
+  const formattedData = {
+    ...partnerData,
+    discounts: Array.isArray(partnerData.discounts)
+      ? partnerData.discounts.map((discount, index) => {
+          if (typeof discount === "string") {
+            return { id: `${index}`, description: discount };
+          }
+          return discount;
+        })
+      : [],
+    image:
+      partnerData.image ||
+      `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(partnerData.name || "Partner")}`,
+    status: "approved", // Set a default status to satisfy the not-null constraint
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase.from("partners").insert(formattedData);
+
+  if (error) {
+    console.error("Error creating partner:", error);
+    throw error;
+  }
 }
 
 /**
@@ -149,12 +179,15 @@ export async function updatePartner(
   id: string,
   partnerData: Partial<Partner>,
 ): Promise<void> {
+  // Format the data to ensure discounts are in the correct format
+  const formattedData = {
+    ...partnerData,
+    updated_at: new Date().toISOString(),
+  };
+
   const { error } = await supabase
     .from("partners")
-    .update({
-      ...partnerData,
-      updated_at: new Date().toISOString(),
-    })
+    .update(formattedData)
     .eq("id", id);
 
   if (error) {
@@ -189,6 +222,41 @@ export async function togglePartnerStatus(
 
   if (error) {
     console.error("Error toggling partner status:", error);
+    throw error;
+  }
+}
+
+/**
+ * Upload a partner image to Supabase storage and return the public URL
+ */
+export async function uploadPartnerImage(
+  file: File,
+  partnerName: string,
+): Promise<string> {
+  try {
+    // Create a unique file name
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${partnerName.replace(/\s+/g, "-").toLowerCase()}-${Date.now()}.${fileExt}`;
+    const filePath = `partner-images/${fileName}`;
+
+    // Upload the file to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from("membership-images")
+      .upload(filePath, file);
+
+    if (uploadError) {
+      console.error("Error uploading file:", uploadError);
+      throw uploadError;
+    }
+
+    // Get the public URL for the uploaded file
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("membership-images").getPublicUrl(filePath);
+
+    return publicUrl;
+  } catch (error) {
+    console.error("Error in image upload process:", error);
     throw error;
   }
 }

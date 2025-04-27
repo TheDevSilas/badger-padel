@@ -9,6 +9,8 @@ import Home from "./components/pages/home";
 import MembershipCard from "./components/pages/membership-card";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import AdminPage from "./components/pages/admin";
+import PartnerDetails from "./components/admin/PartnerDetails";
+import PartnerRegistrationPage from "./components/pages/partner-registration";
 import { AuthProvider, useAuth } from "../supabase/auth";
 import { Toaster } from "./components/ui/toaster";
 import { LoadingScreen, LoadingSpinner } from "./components/ui/loading-spinner";
@@ -45,6 +47,10 @@ function AppRoutes() {
         />
         <Route path="/success" element={<Success />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route
+          path="/partner-registration"
+          element={<PartnerRegistrationPage />}
+        />
       </Routes>
       {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
     </>

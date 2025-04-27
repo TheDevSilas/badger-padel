@@ -28,9 +28,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Partner, PartnerType, Discount } from "@/models/Partner";
-import { updatePartner } from "@/services/partnerService";
+import {
+  updatePartner,
+  createPartner,
+  uploadPartnerImage,
+} from "@/services/partnerService";
 import { useToast } from "@/components/ui/use-toast";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Upload, Image } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -57,6 +61,7 @@ interface PartnerEditFormProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  isCreating?: boolean;
 }
 
 export default function PartnerEditForm({
@@ -64,11 +69,15 @@ export default function PartnerEditForm({
   open,
   onClose,
   onSuccess,
+  isCreating = false,
 }: PartnerEditFormProps) {
   const { toast } = useToast();
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [newDiscount, setNewDiscount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -95,8 +104,26 @@ export default function PartnerEditForm({
         contactPerson: partner.contactPerson || "",
       });
       setDiscounts(partner.discounts || []);
+      setImagePreview(partner.imageUrl || null);
+    } else {
+      setImagePreview(null);
+      setSelectedImage(null);
     }
   }, [partner, form]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedImage(file);
+
+    // Create a preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleAddDiscount = () => {
     if (newDiscount.trim() === "") return;
@@ -115,28 +142,65 @@ export default function PartnerEditForm({
   };
 
   const onSubmit = async (data: FormValues) => {
-    if (!partner) return;
-
     try {
       setIsSubmitting(true);
+      let imageUrl = partner?.imageUrl;
 
-      await updatePartner(partner.id, {
-        ...data,
-        discounts,
-      });
+      // Upload image if selected
+      if (selectedImage) {
+        setIsUploading(true);
+        try {
+          imageUrl = await uploadPartnerImage(selectedImage, data.name);
+        } catch (error) {
+          console.error("Error uploading image:", error);
+          toast({
+            title: "Error",
+            description:
+              "Failed to upload image. Partner will be saved without an image.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsUploading(false);
+        }
+      }
 
-      toast({
-        title: "Success",
-        description: "Partner updated successfully",
-      });
+      if (isCreating) {
+        // Create new partner
+        await createPartner({
+          ...data,
+          discounts: discounts.map((d) => d.description),
+          active: true,
+          imageUrl,
+        });
+
+        toast({
+          title: "Success",
+          description: "Partner created successfully",
+        });
+      } else if (partner) {
+        // Update existing partner
+        await updatePartner(partner.id, {
+          ...data,
+          discounts,
+          imageUrl,
+        });
+
+        toast({
+          title: "Success",
+          description: "Partner updated successfully",
+        });
+      } else {
+        console.error("No partner data available");
+        return;
+      }
 
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Error updating partner:", error);
+      console.error("Error saving partner:", error);
       toast({
         title: "Error",
-        description: "Failed to update partner. Please try again.",
+        description: "Failed to save partner. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -186,6 +250,7 @@ export default function PartnerEditForm({
                       <SelectItem value="court">Court</SelectItem>
                       <SelectItem value="shop">Shop</SelectItem>
                       <SelectItem value="brand">Brand</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -303,11 +368,50 @@ export default function PartnerEditForm({
               </div>
             </div>
 
+            {/* Image Upload Section */}
+            <div className="space-y-2">
+              <FormLabel>Partner Image</FormLabel>
+              <div className="flex flex-col space-y-4">
+                {imagePreview && (
+                  <div className="relative w-40 h-40 mx-auto">
+                    <img
+                      src={imagePreview}
+                      alt="Partner preview"
+                      className="w-full h-full object-cover rounded-md"
+                    />
+                  </div>
+                )}
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6">
+                  <Image className="h-10 w-10 text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-500 mb-4">
+                    {imagePreview ? "Change image" : "Upload partner image"}
+                  </p>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      onChange={handleImageChange}
+                      disabled={isUploading}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isUploading}
+                      className="relative pointer-events-none"
+                    >
+                      {isUploading ? "Uploading..." : "Select Image"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || isUploading}>
                 {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>

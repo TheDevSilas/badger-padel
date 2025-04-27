@@ -93,6 +93,13 @@ export default function PartnerDirectory() {
             >
               Brands
             </Button>
+            <Button
+              variant={activeFilter === "other" ? "default" : "outline"}
+              onClick={() => setActiveFilter("other")}
+              className="rounded-full"
+            >
+              Other
+            </Button>
           </div>
           <div className="relative w-full md:w-auto">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />

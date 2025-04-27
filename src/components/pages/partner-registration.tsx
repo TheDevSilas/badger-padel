@@ -20,7 +20,7 @@ export default function PartnerRegistrationPage() {
           <img
             src="/images/White Badger Logo.PNG"
             alt="Badger Padel Logo"
-            className="h-20 w-auto mx-auto mb-4"
+            className="h-32 w-auto mx-auto mb-4"
           />
         </div>
 
